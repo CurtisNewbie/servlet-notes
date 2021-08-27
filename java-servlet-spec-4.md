@@ -83,21 +83,51 @@ Async processing in `Servlet` is through the use of **AsyncContext**.
 
 ### 2.4.1 Start Async 
 
+```
+ServletRequest 
+
+    AsyncContext startAsync() throws IllegalStateException;
+```
+
 To start async processing, in **ServletRequest**, we call **AsyncContext startAsync(...)** to put the requests in asynchrounous mode, which initializes the `AsyncContext` for it. Calling this method also make sure that ***when the `Servlet#service` method is finished, the response isn't committed immediately*** (since the processing may be delegated to another thread. When the `service` method returns, it doesn't mean the processing is actually finished). 
 
 ### 2.4.2 Complete Async
+
+```
+AsyncContext
+    
+    void complete();
+```
 
 Only when the **AsyncContext#complete()** is called or the `AsyncContext` is **timed out**, the response is committed. 
 
 ### 2.4.3 Async Support
 
+```
+ServletRequest 
+
+    boolean isAsyncSupported();
+```
+
 We can also check if request supports async processing through **ServletRequest#isAsyncSupported()**. Async support for a servlet request is disabled when one of the filter passed in or the servlet doesn't support async processing.
 
 ### 2.4.4 Check Is Async Started
 
+```
+ServletRequest 
+
+    boolean isAsyncStarted();
+```
+
 **ServletRequest#isAsyncStarted()** tells whether the async processing for given request is started or not. If the request is dispatched (e.g., to another path) using **AsyncContext.dispatch** method, or the **AsyncContext#complete** is called (meaning the async processing is finished), this method returns false.
 
 ### 2.4.5 Request Dispatcher Type
+
+```
+ServletRequest 
+
+    DispatcherType getDispatcherType();
+```
 
 DispatcherType of a request can be checked using **ServletRequest#getDispatcherType()** method. ***"The dispatcher type of a request is used by the container to select the filters that need to be applied to the request. Only filters with the matching dispatcher type and url patterns will be applied."***  
 
@@ -214,3 +244,179 @@ THEN
     wsUpgradeHandler.destroy()
 FI
 ```
+
+# 3. Chap 3 The Request
+
+## 3.1 HTTP Protocol Parameters
+
+Request parameters are strings sent to **Servlet Container** as part of the request, when they are 'available', the container extracts these parameters from URI query strings (query parameters) and POST data, and store them in the request in forms of key-value map. There can be multiple values for the same parameter name. However, the **Path Parameters** for **GET** requests are not exposed through these APIs, they can only be retrieved by parsing **HttpServletRequest#getRequestURI** or **HttpServletRequest#getPathInfo** methods.
+
+In **ServletRequest**, there are methods provided to access to these prameters:
+
+- String getParameter(String);
+- Enumeration<String> getParameterNames();
+- String[] getParameterValues(String name);
+- Map<String, String[]> getParameterMap();
+
+## 3.2 File Upload
+
+Files are uploaded when the request is **multipart/form-data**. When `mutipart/form-data` request is supported by the container, the data can be accessed through following methods on HttpServletRequest:
+
+HttpServletRequest:
+
+- Collection<Part> getParts() throws IOException, ServletException;
+- Part getPart(String name) throws IOException, ServletException; 
+
+Each **Part** provides access to the headers, content type and input stream for it. If the servlet container doesn't support multipart/form-data processing, the data will be accessible through **HttpServletRequest.getInputStream()**.
+
+## 3.3 Attributes
+
+Attributes of a request (ServletRequest) are extra information set for communication between components (e.g., between Servlets). The servlet container may set attributes to a request to make available some information about a client. One key corresponds to one single value, they can be set or retriveved from a request through following methods on ServletRequest:
+
+ServletRequest:
+
+- void setAttribute(String name, Object o);
+- void removeAttribute(String name);
+- Object getAttribute(String name);
+
+## 3.4 Headers
+
+Headers of HTTP request can be retrieved by follwing methods on **HttpServletRequest**. There can be multiple headers for the same name, `getHeader(String)` returns the first header, while `getHeaders(String)` return all header values. Convenient methods include `getIntHeader(String)` and `getDateHeader(String)`.
+
+HttpServletRequest:
+
+- String getHeader(String name);
+- Enumeration<String> getHeaders(String name);
+- Enumeration<String> getHeaderNames();
+
+## 3.5 Request Path Elements
+
+The request path consists of multiple sections:
+
+- Context Path
+    - The path prefix associated with the **ServletContext**, if the context is the default context rooted at the base of the web server's name space, this path will be empty string, otherwise, it will start with '/' but not end with '/'.
+- Servlet Path
+    - The path that is used to match servlet(s), this path will start with '/', unless the context path is '/' or '' empty string.
+- PathInfo
+    - The section that is not part of context or servlet path, think of it as an extra path. If there is no extra path, it's simply null, otherwise, it starts with '/'. 
+
+```
+requestURI = contextPath + servletPath + pathInfo
+```
+
+These three sections can be accessed through:
+
+HttpServletRequest:
+
+- String getContextPath();
+- String getServletPath();
+- String getPathInfo();
+
+## 3.6 Path Translation Method
+
+Two methods are provided to translate given path to a file system path.
+
+- ServletContext.getRealPath(String);
+- HttpServletRequest.getPathTranslate();
+
+## 3.7 Non Blocking I/O
+
+**ServletInputStream** and **ServletOutputStream** register **ReadListener** and the **WriteListener** for non blocking I/O, they react to the callback invocation by reading from the `ServletInputStream` or writing to the `ServletOutputStream`. 
+
+For `ServletInputStream`, the registered listener is **ReadListener**, its callback methods are invoked by the container: 
+
+1. when there are data available (for which the implementation will consume the incoming data, e.g., a byte buffer)  
+2. when all data has been consumed by the consumer (i.e., we are done here); 
+3. when there are some sort of I/O related problems occurred. 
+
+This works in a reactive fasion, so reactive programming like RxJava is normally used, e.g., when `onDataAvailable()` is called by the container, the implementation of **ReadListener** consumes/read data from the inputStream in forms of a `ByteBuffer`, then it publishes this `ByteBuffer` to its subscriber.
+
+ReadListener:
+
+- void onDataAvailable() throws IOException;
+- void onAllDataRead() throws IOException;
+- void onError(Throwable t);
+
+WriteListener:
+
+- void onWritePossible() throws IOException;
+- void onError(final Throwable t);
+
+## 3.8 HTTP/2 Server Push
+
+**Server push** is for performance improvement. When a client requests a specific resource (say *A*), server may know in advance that the client will be requested resource *B*, *C* and *D* following the initial request, in this case, the server may use **Server Push** to push the bytes of resource *B*, *C*, and *D* right after the request for *A*. 
+
+The server push is used by creating a **PushBuilder** (through calling **HttpServletRequest.newPushBuilder()**), then customize the `PushBuilder` and finally call **PushBuilder.push()** to push the resource to client. 
+
+## 3.9 Cookies
+
+All Cookies presented on a request can be retrieved through **HttpServletRequest.getCookies()**, `Cookie` can be set to **HttpOnly** that asks the browser not to expose cookie values to scripts.
+
+## 3.10 SSL Attributes
+
+When a request is tranmitted over a secure protocol like HTTPS, the **ServletRequest.isSecure()** will return true. The web container will also exposes following attributes that can be retrieved from `ServletRequest`.
+
+Attribute|Attribute Name (key)|Java Type|
+---|---|---|
+cipher suite|javax.servlet.request.cipher_suite|String|
+bit size of algorithm|javax.servlet.request.key_size|Integer|
+SSL session id|javax.servlet.request.ssl_session_id|String|
+SSL certificate|java.security.cert.X509Certificate|X509Certificate|
+
+E.g.,
+
+In tomcat, it put a SSL attribute if found:
+
+```
+public static final String CERTIFICATES_ATTR = "javax.servlet.request.X509Certificate";
+
+// ...
+
+attr = coyoteRequest.getAttribute(Globals.CERTIFICATES_ATTR);
+if (attr != null) {
+    attributes.put(Globals.CERTIFICATES_ATTR, attr);
+}
+
+// ...
+```
+
+Then in Spring, the framework writes a `Filter` to retrive the certificate from attribute
+
+```
+//...
+
+private X509Certificate extractClientCertificate(HttpServletRequest request) {
+    X509Certificate[] certs = 
+        (X509Certificate[]) request.getAttribute("javax.servlet.request.X509Certificate");
+    if (certs != null && certs.length > 0) {
+        return certs[0];
+    }
+    return null;
+}
+
+// ...
+```
+
+## 3.11 Internationization
+
+Clients may tell the server which language they prefer, this information is communciated using header **Accept-Language**. This information can be retrieved by following methods in **ServletRequest**. 
+
+ServletRequest:
+
+- Locale getLocale();
+- Enumeration<Locale> getLocales();
+
+## 3.12 Request Data Encoding
+
+Data encoding is described through the header **Content-Type**. 
+
+## 3.13 Lifecycle of Request Object
+
+***"Each request object is valid only within the scope of a servlet’s service method, or within the scope of a filter’s doFilter method, unless the asynchronous processing is enabled for the component and the startAsync method is invoked on the request object. In the case where asynchronous processing occurs, the request object remains valid until complete is invoked on the AsyncContext."***
+
+# 4. Chap 4 Servlet Context
+
+
+
+
+
