@@ -31,7 +31,7 @@ Relation between `web server`, `servlet container` and `servlet`:
 
 ## 2.1 Servlet, Generic Servlet and HttpServlet 
 
-In Java Servlet APIs, two classes implements **Servletx**, they are **GenericServlet** and **HttpServlet**.
+In Java Servlet APIs, two classes implements **Servlet**, they are **GenericServlet** and **HttpServlet**.
 
 ```
                    +-----------+
@@ -46,7 +46,7 @@ In Java Servlet APIs, two classes implements **Servletx**, they are **GenericSer
                  |                 |
 +----------------+--+           +--+-------------+
 |                   |           |                |
-|  Generic Servlet  |           |  HttplServlet  |
+|  Generic Servlet  |           |  HttpServlet   |
 |                   |           |                |
 +-------------------+           +----------------+
 ```
@@ -69,7 +69,7 @@ Servlet container will create only one instance per serlvet declaration (i.e., o
 
 ## 2.3 Servlet Life Cycle
 
-The life cycle of a `Servlet` is expressed in the `Servlet` interface through **init**, **service** and **destroy** methods. The Servlet Container is responsible for instantiating (through normal class loading mechanism) and initializsing each `Servlet` instance before it's active and consumes incoming requests. 
+The life cycle of a `Servlet` is expressed in the `Servlet` interface through **init**, **service** and **destroy** methods. The Servlet Container is responsible for instantiating (through normal class loading mechanism) and initializing each `Servlet` instance before it's active and consumes incoming requests. 
 
 The **init** method is called to initialize the `Servlet` instance, during the method call, the instance may throw **UnavailableException** or **ServletException**, in which case the `Servlet` instance is no longer active, and it's **destroy** method is not called because it's not successfully initialized. 
 
@@ -174,7 +174,7 @@ Once request enters the servlet container, it's at **dispatching** state, the se
                  +-------------+                     +------------+
 ```
 
-At **dispatched** state, the request start async mode by calling **startAsync()**, which then enters the **AsyncStarted** state, before calling the **complete()** method, this async operation is not commited yet, it remains at **AsyncWait** or **Completing** state, after calling **complete()**, it then enters **Completed** state.
+At **dispatched** state, the request start async mode by calling **startAsync()**, which then enters the **AsyncStarted** state, before calling the **complete()** method, this async operation is not committed yet, it remains at **AsyncWait** or **Completing** state, after calling **complete()**, it then enters **Completed** state.
 
 ```
                 +------------+                +--------------+  
@@ -214,7 +214,7 @@ Notice that the argument is a class of type **HttpUpgradeHandler**, this handler
 
 When the `#upgrade` method is called, and the servlet has done processing the request, the servlet container knows that this connection should be handled by the appropriate **HttpUpgradeHandler**, so it calls the **HttpUpgradeHandler#init(WebConnection)** method for the handler to access to data streams, providing the **WebConnection** object, which internally contains **ServletInputStream** and **ServletOutputStream**. Once the upgrade is done, the **HttpUpgradeHandler#destroy** is called.
 
-E.g, in tomcat, the upgrade for websocket is implemented in a Filter, the Filter starts with checking if the ServletRequest is a HTTP request and whether it contains the upgrade header for the websocket. If it does, it starts the negotiation process, and if it was succesful, it creates the `WsHttpUpgradeHandler` that implements `HttpUpgradeHandler` by calling the `HttpServletRequest#upgrade(...)` method. Then it stores the handler in the request (via `UpgradeToken`) for the general purpose components to later trigger the upgrade process (by calling `HttpUpgradeHandler#init(...)`). 
+E.g, in tomcat, the upgrade for websocket is implemented in a Filter, the Filter starts with checking if the ServletRequest is a HTTP request and whether it contains the upgrade header for the websocket. If it does, it starts the negotiation process, and if it was successful, it creates the `WsHttpUpgradeHandler` that implements `HttpUpgradeHandler` by calling the `HttpServletRequest#upgrade(...)` method. Then it stores the handler in the request (via `UpgradeToken`) for the general purpose components to later trigger the upgrade process (by calling `HttpUpgradeHandler#init(...)`). 
 
 General idea:
 
@@ -229,7 +229,7 @@ THEN
         wsUpgradeHandler = request.upgrade(WsHttpUpgradeHandler.class)
 
         // do some pre-init things for the handler
-        // store the handler in UpradeToken and trigger the upgrade later
+        // store the handler in UpgradeToken and trigger the upgrade later
         // ...
     FI
 FI
@@ -237,7 +237,7 @@ FI
 // ... later, check if we are upgrading for the request
 // if so, do the upgrade
 
-IF has UpradeToken
+IF has UpgradeToken
 THEN
     wsUpgradeHandler = upgradeToken.getHandler(...)
     wsUpgradeHandler.init(webConnection)
@@ -251,7 +251,7 @@ FI
 
 Request parameters are strings sent to **Servlet Container** as part of the request, when they are 'available', the container extracts these parameters from URI query strings (query parameters) and POST data, and store them in the request in forms of key-value map. There can be multiple values for the same parameter name. However, the **Path Parameters** for **GET** requests are not exposed through these APIs, they can only be retrieved by parsing **HttpServletRequest#getRequestURI** or **HttpServletRequest#getPathInfo** methods.
 
-In **ServletRequest**, there are methods provided to access to these prameters:
+In **ServletRequest**, there are methods provided to access to these parameters:
 
 - String getParameter(String)
 - Enumeration<String> getParameterNames()
@@ -260,7 +260,7 @@ In **ServletRequest**, there are methods provided to access to these prameters:
 
 ## 3.2 File Upload
 
-Files are uploaded when the request is **multipart/form-data**. When `mutipart/form-data` request is supported by the container, the data can be accessed through following methods on HttpServletRequest:
+Files are uploaded when the request is **multipart/form-data**. When `multipart/form-data` request is supported by the container, the data can be accessed through following methods on HttpServletRequest:
 
 HttpServletRequest:
 
@@ -271,7 +271,7 @@ Each **Part** provides access to the headers, content type and input stream for 
 
 ## 3.3 Attributes
 
-Attributes of a request (ServletRequest) are extra information set for communication between components (e.g., between Servlets). The servlet container may set attributes to a request to make available some information about a client. One key corresponds to one single value, they can be set or retriveved from a request through following methods on ServletRequest:
+Attributes of a request (ServletRequest) are extra information set for communication between components (e.g., between Servlets). The servlet container may set attributes to a request to make available some information about a client. One key corresponds to one single value, they can be set or retrieved from a request through following methods on ServletRequest:
 
 ServletRequest:
 
@@ -281,7 +281,7 @@ ServletRequest:
 
 ## 3.4 Headers
 
-Headers of HTTP request can be retrieved by follwing methods on **HttpServletRequest**. There can be multiple headers for the same name, `getHeader(String)` returns the first header, while `getHeaders(String)` return all header values. Convenient methods include `getIntHeader(String)` and `getDateHeader(String)`.
+Headers of HTTP request can be retrieved by following methods on **HttpServletRequest**. There can be multiple headers for the same name, `getHeader(String)` returns the first header, while `getHeaders(String)` return all header values. Convenient methods include `getIntHeader(String)` and `getDateHeader(String)`.
 
 HttpServletRequest:
 
@@ -328,7 +328,7 @@ For `ServletInputStream`, the registered listener is **ReadListener**, its callb
 2. when all data has been consumed by the consumer (i.e., we are done here) 
 3. when there are some sort of I/O related problems occurred. 
 
-This works in a reactive fasion, so reactive programming like RxJava is normally used, e.g., when `onDataAvailable()` is called by the container, the implementation of **ReadListener** consumes/read data from the inputStream in forms of a `ByteBuffer`, then it publishes this `ByteBuffer` to its subscriber.
+This works in a reactive fashion, so reactive programming like RxJava is normally used, e.g., when `onDataAvailable()` is called by the container, the implementation of **ReadListener** consumes/read data from the inputStream in forms of a `ByteBuffer`, then it publishes this `ByteBuffer` to its subscriber.
 
 ReadListener:
 
@@ -343,7 +343,7 @@ WriteListener:
 
 ## 3.8 HTTP/2 Server Push
 
-**Server push** is for performance improvement. When a client requests a specific resource (say *A*), server may know in advance that the client will be requested resource *B*, *C* and *D* following the initial request, in this case, the server may use **Server Push** to push the bytes of resource *B*, *C*, and *D* right after the request for *A*. 
+**Server push** is for performance improvement. When a client requests a specific resource (say *A*), server may know in advance that the client will be requesting resource *B*, *C* and *D* following the initial request, in this case, the server may use **Server Push** to push the bytes of resource *B*, *C*, and *D* right after the request for *A* in parallel. 
 
 The server push is used by creating a **PushBuilder** (through calling **HttpServletRequest.newPushBuilder()**), then customize the `PushBuilder` and finally call **PushBuilder.push()** to push the resource to client. 
 
@@ -353,7 +353,7 @@ All Cookies presented on a request can be retrieved through **HttpServletRequest
 
 ## 3.10 SSL Attributes
 
-When a request is tranmitted over a secure protocol like HTTPS, the **ServletRequest.isSecure()** will return true. The web container will also exposes following attributes that can be retrieved from `ServletRequest`.
+When a request is transmitted over a secure protocol like HTTPS, the **ServletRequest.isSecure()** will return true. The web container will also exposes following attributes that can be retrieved from `ServletRequest`.
 
 Attribute|Attribute Name (key)|Java Type|
 ---|---|---|
@@ -379,7 +379,7 @@ if (attr != null) {
 // ...
 ```
 
-Then in Spring, the framework writes a `Filter` to retrive the certificate from attribute
+Then in Spring, the framework writes a `Filter` to retrieve the certificate from attribute
 
 ```
 //...
@@ -396,9 +396,9 @@ private X509Certificate extractClientCertificate(HttpServletRequest request) {
 // ...
 ```
 
-## 3.11 Internationization
+## 3.11 Internationalization
 
-Clients may tell the server which language they prefer, this information is communciated using header **Accept-Language**. This information can be retrieved by following methods in **ServletRequest**. 
+Clients may tell the server which language they prefer, this information is communicated using header **Accept-Language**. This information can be retrieved by following methods in **ServletRequest**. 
 
 ServletRequest:
 
@@ -423,7 +423,7 @@ There is one **ServletContext** instance associated with each web application de
 
 ## 4.2 Initialization Parameters
 
-**ServletContext** interface provides following method sto access to the context initialization parameters that are specified by the developers in **deployment descripto**
+**ServletContext** interface provides following method sto access to the context initialization parameters that are specified by the developers in **deployment descriptor**
 
 - String getInitParameter(String name)
 - Enumeration<String> getInitParameterNames()
@@ -546,7 +546,7 @@ ServletOutputStream:
 - void sendError(int sc, String msg) throws IOException 
     - send an error response to client
 
-## 5.5 Internationlization
+## 5.5 Internationalization
 
 Locale and character encoding of a response can be set using **ServletResponse.setLocale(...)** method and **ServletResponse.setCharacterEncoding(...)**. If none character encoding is specified, the default is **ISO-8859-1**.
 
@@ -593,9 +593,9 @@ The container first locates and instantiates the list of filters, and calls thei
 +---------------------------------------------------+
 ```
 
-An implemnetation might be just like above. A **FilterChain** implementation internally contains a list of **Filter** for a request, it internally maintains a pointer (say `'int currFilter'`) pointing to current filter, it starts with calling first filter's `doFilter(...)` method, once the first filter finishes, it calls the filter chain's `doFilter(...)` method, then the filter chain calls next filter just like `'filters[++currFilter].doFilter(...)'`. 
+An implementation might be just like above. A **FilterChain** implementation internally contains a list of **Filter** for a request, it internally maintains a pointer (say `'int currFilter'`) pointing to current filter, it starts with calling first filter's `doFilter(...)` method, once the first filter finishes, it calls the filter chain's `doFilter(...)` method, then the filter chain calls next filter just like `'filters[++currFilter].doFilter(...)'`. 
 
-Each filter may transform the request and response object by wraping them in order, so that their behaviours are modified. E.g., for handling multipart/form-data requests, there may be a filter that wraps the original `HttpServletRequest` and `HttpServletResponse` with custom implementation that is able to parse multipart requests' Part and parameters.
+Each filter may transform the request and response object by wrapping them in order, so that their behaviours are modified. E.g., for handling multipart/form-data requests, there may be a filter that wraps the original `HttpServletRequest` and `HttpServletResponse` with custom implementation that is able to parse multipart requests' Part and parameters.
 
 After invocation of next filter in the chain, current filter may evaluates the response object. It may look like below.
 
@@ -618,7 +618,7 @@ Before container removes a filter instance, it will call **Filter.destroy()** me
 
 # 7. Chap 7 Sessions
 
-Standard name of session tracking cookie (name) must be **'JSESSIONID'**, this may be customized. A session is considered **'new'** only when it has not been established. ***When session tracking information (e.g., the cookie) has returned from client to server, the session is estbalished***, i.e., it's not considered as 'new' any more. 
+Standard name of session tracking cookie (name) must be **'JSESSIONID'**, this may be customized. A session is considered **'new'** only when it has not been established. ***When session tracking information (e.g., the cookie) has returned from client to server, the session is established***, i.e., it's not considered as 'new' any more. 
 
 The session is considered to be 'new' if:
 
@@ -632,7 +632,7 @@ Session id can be retrieved or changed using methods below:
 
 ## 7.1 Binding Attributes into a Session 
 
-Attribtues can be bound to a session (**HttpSession** implementation). Listeners that implements **HttpSessionBindingListener** are notified for the events of attributes binding **valueBound** (attribute set) and **valudUnbound** (attribute removed). 
+Attributes can be bound to a session (**HttpSession** implementation). Listeners that implements **HttpSessionBindingListener** are notified for the events of attributes binding **valueBound** (attribute set) and **valueUnbound** (attribute removed). 
 
 ## 7.2 Session Timeouts
 
@@ -668,7 +668,7 @@ ServletContext:
 - RequestDispatcher getRequestDispatcher(String path) 
     - get request dispatcher for given path, the path is relative to servlet context's path
 - RequestDispatcher getNamedDispatcher(String name) 
-    - get request dispatcher based onthe name of a servlet that is known to the servlet context
+    - get request dispatcher based on the name of a servlet that is known to the servlet context
 
 RequestDispatcher that is relative to current request, we can also get this kind of RequestDispatcher from **ServletRequest** using **ServletRequest.getRequestDispatcher(String path)**.
 
@@ -705,7 +705,7 @@ Except for servlets obtainer by `getNamedDispatcher(...)` method, when a request
 
 ### 8.3.2 Forward Method
 
-The **RequestDispatcher.forward(...)** method can only be called when there is no output commited to client. If there are data in response output buffer, these data are also cleared before the forwarded servlet's `service` method. The response will be committed and closed by the servlet container before the `forward` method returns, i.e., this is completely handled by the forwarded servlet. For the forwarded servlet, except for dispatcher that is obtained by `getNamedDispatcher(...)`, container will set following attributes:
+The **RequestDispatcher.forward(...)** method can only be called when there is no output committed to client. If there are data in response output buffer, these data are also cleared before the forwarded servlet's `service` method. The response will be committed and closed by the servlet container before the `forward` method returns, i.e., this is completely handled by the forwarded servlet. For the forwarded servlet, except for dispatcher that is obtained by `getNamedDispatcher(...)`, container will set following attributes:
 
 - javax.servlet.forward.mapping
 - javax.servlet.forward.request_uri
@@ -822,9 +822,9 @@ Rules (**in-order** and **case-sensitive**):
 ## 12.1 Authentication
 
 - HTTP Basic Authentication
-    - username and password based authentication, server requests (or say, challenges) user to authenticate itself, as part of this request/challenge, the server passes a **realm** (which is essentially specified string that may neven change, e.g., "Access to the site"), then the client encodes the username and password using **base64**, it's not secure. 
+    - username and password based authentication, server requests (or say, challenges) user to authenticate itself, as part of this request/challenge, the server passes a **realm** (which is essentially a specified string that may never change, e.g., "Access to the site"), then the client encodes the username and password using **base64**, it's not secure. 
 - HTTP Digest Authentication
-    - similar to BASIC, but it sends password's hash (possbily with additional data that is hased together with the password) to server.
+    - similar to BASIC, but it sends password's hash (possibly with additional data that is hashed together with the password) to server.
 - HTTPS Client Authentication
     - exchanging digital certificates between client and server, instead of using username and password.
 - Form Based Authentication
