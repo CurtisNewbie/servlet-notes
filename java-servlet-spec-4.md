@@ -315,7 +315,6 @@ HttpServletRequest:
 ## 3.6 Path Translation Method
 
 Two methods are provided to translate given path to a file system path.
-
 - ServletContext.getRealPath(String)
 - HttpServletRequest.getPathTranslate()
 
@@ -498,12 +497,18 @@ A servlet container may or may not buffer output to client. We can configure the
 
 ServletResponse
 
-- int getBufferSize() - get buffer size (if not buffering is used, it will be 0)
-- void setBufferSize(int) - set buffer size
-- boolean isCommitted() - check if the response is committed
-- void reset() - clear any data left in buffer including status code and headers
-- void resetBuffer() - clear any data left in buffer
-- void flushBuffer() - flush the buffer
+- int getBufferSize() 
+    - get buffer size (if not buffering is used, it will be 0)
+- void setBufferSize(int) 
+    - set buffer size
+- boolean isCommitted() 
+    - check if the response is committed
+- void reset() 
+    - clear any data left in buffer including status code and headers
+- void resetBuffer() 
+    - clear any data left in buffer
+- void flushBuffer() 
+    - flush the buffer
 
 ## 5.2 Headers
 
@@ -520,20 +525,26 @@ Non-blocking IO only works with async request and upgrade processing. Similar to
 
 WriteListener:
 
-- void onWritePossible() throws IOException - invoked by container when it can write data
-- void onError(final Throwable t) - handle errors occurred
+- void onWritePossible() throws IOException 
+    - invoked by container when it can write data
+- void onError(final Throwable t) 
+    - handle errors occurred
 
 ServletOutputStream:
 
-- boolean isReady() - tells if the ServletOutputStream is ready to take data
-- void setWriteListener(WriteListener writeListener) - registers a `WriteListener` to write data when it's appropriate
+- boolean isReady() 
+    - tells if the ServletOutputStream is ready to take data
+- void setWriteListener(WriteListener writeListener) 
+    - registers a `WriteListener` to write data when it's appropriate
 
 ## 5.4 Convenience Methods
 
 **HttpServletResponse** interface provides following convenience methods, these convenience methods have side effect of committing the response, however, if these methods are called when the response is already committed, IllegalStateException is thrown.
 
-- void sendRedirect(String location) throws IOException - send a redirect response to client
-- void sendError(int sc, String msg) throws IOException - send an error response to client
+- void sendRedirect(String location) throws IOException 
+    - send a redirect response to client
+- void sendError(int sc, String msg) throws IOException 
+    - send an error response to client
 
 ## 5.5 Internationlization
 
@@ -554,4 +565,268 @@ When a response is closed, the container immediately flushes all remaining data 
 ***"Each response object is valid only within the scope of a servlet’s service method, or within the scope of a filter’s doFilter method, unless the associated request object has asynchronous processing enabled for the component. If asynchronous processing on the associated request is started, then the response object remains valid until complete method on AsyncContext is called."***
 
 # 6. Filtering
+
+A **Filter** is a component that can transform or modify the content and headers of HTTP requests and response. Application developer creates a filter by implementing the interface **javax.servlet.Filter** and provide a **public default constructor** (for bean instantiation), the filter is declared in **deployment descriptor** and mapped to one or more servlets or a URL pattern. 
+
+## 6.1 Filter Lifecycle
+
+The container first locates and instantiates the list of filters, and calls their **Filter.init(FilterConfig)** method. Only one instance for each Filter is created per JVM.  When the container receives a request, it takes the first filter in the list and calls the **Filter.doFilter(ServletRequest, ServletResponse, FilterChain)** method. A filter in filter chain may choose to block the request by not calling **FilterChain.doFilter(...)**. 
+
+```
++---------------------------------------------------+ 
+|                                                   | FilterChain
+|   FilterChain -+ <+  -------+                     |
+|  ^             |  |         |                     |
+|  |             |  |         |                     |
+|  |             |  |         |                     |
+|  |             |  |         |                     |
+|  |             |  |         |                     |
+| doFilter()     | doFilter() |                     |
+|  ^             |  ^         | ^                   |
+|  |             v  |         v |                   |
+| ++--------+-------+--+--------+-+---------------+ |
+| |         |          |          |               | |
+| | Filter1 | Filter2  | Filter3  | . . . . .     | |
+| |         |          |          |               | |
+| +---------+----------+----------+---------------+ |
+|                                                   |
++---------------------------------------------------+
+```
+
+An implemnetation might be just like above. A **FilterChain** implementation internally contains a list of **Filter** for a request, it internally maintains a pointer (say `'int currFilter'`) pointing to current filter, it starts with calling first filter's `doFilter(...)` method, once the first filter finishes, it calls the filter chain's `doFilter(...)` method, then the filter chain calls next filter just like `'filters[++currFilter].doFilter(...)'`. 
+
+Each filter may transform the request and response object by wraping them in order, so that their behaviours are modified. E.g., for handling multipart/form-data requests, there may be a filter that wraps the original `HttpServletRequest` and `HttpServletResponse` with custom implementation that is able to parse multipart requests' Part and parameters.
+
+After invocation of next filter in the chain, current filter may evaluates the response object. It may look like below.
+
+```
+      +---------+
+      |         |        1)
+----->| Filter1 |                    +---------+
+  ^   |         +----> doFilter(...) |         |        2)
+  |   +---------+                ^   | Filter2 |                    +---------+
+  |                              |   |         +----> doFilter(...) |         |        3)
+  +------------------------------+   +---------+                ^   | Filter3 |
+          6)                     |                              |   |         +----> doFilter(...)
+                                 +------------------------------+   +---------+        |
+                                           5)                   |                      |
+                                                                +----------------------+
+                                                                         4)
+```
+
+Before container removes a filter instance, it will call **Filter.destroy()** method to clean up resources.
+
+# 7. Chap 7 Sessions
+
+Standard name of session tracking cookie (name) must be **'JSESSIONID'**, this may be customized. A session is considered **'new'** only when it has not been established. ***When session tracking information (e.g., the cookie) has returned from client to server, the session is estbalished***, i.e., it's not considered as 'new' any more. 
+
+The session is considered to be 'new' if:
+
+- the client doesn't yet know about the session
+- the client chooses not to join/establish the session (not returning it back to server, i.e., the session is ignored)
+
+Session id can be retrieved or changed using methods below:
+
+- HttpSession.getId() - get current session id
+- httpServletRequest.changeSessionId() - change to newly generated session id
+
+## 7.1 Binding Attributes into a Session 
+
+Attribtues can be bound to a session (**HttpSession** implementation). Listeners that implements **HttpSessionBindingListener** are notified for the events of attributes binding **valueBound** (attribute set) and **valudUnbound** (attribute removed). 
+
+## 7.2 Session Timeouts
+
+Session timeouts can be configured using methods below (in seconds). If the timeout period is set to 0, the sessions never timeout.
+
+- ServletContext.getSessionTimeout()
+- ServletContext.setSessionTimeout(int)
+- HttpSession.getMaxInactiveInterval()
+- HttpSession.setMaxInactiveInterval(int)
+
+## 7.3 Last Accessed Times
+
+The **HttpSession.getLastAccessedTime()** can be used by servlet to determine the last time the session that was accessed.
+
+## 7.4 Threading Issues
+
+Multiple servlets in different threads might be accessing the same session concurrently, so ***access to session's attributes must be properly synchronized***. 
+
+# 8. Chap 9 Dispatching Requests
+
+**RequestDispatcher** provides ways to achieve: 
+
+- forward processing of a request from a servlet to another servlet
+- include the output of another servlet in response  
+- dispatch request back to servlet container for async processing request
+
+## 8.1 Obtaining RequestDispatcher
+
+RequestDispatcher can be obtained through **ServletContext**.
+
+ServletContext:
+
+- RequestDispatcher getRequestDispatcher(String path) 
+    - get request dispatcher for given path, the path is relative to servlet context's path
+- RequestDispatcher getNamedDispatcher(String name) 
+    - get request dispatcher based onthe name of a servlet that is known to the servlet context
+
+RequestDispatcher that is relative to current request, we can also get this kind of RequestDispatcher from **ServletRequest** using **ServletRequest.getRequestDispatcher(String path)**.
+
+## 8.2 Query Parameters in Request Dispatcher Paths
+
+RequestDispatcher allows using query parameters, but this only applies to type **include** and **forward**.
+
+e.g.,
+
+```
+RequestDispatcher rd = servletContext.getRequestDispatcher("/some/request?fruit=apple");
+rd.include(request, response);
+```
+
+## 8.3 Using Request Dispatcher
+
+To use a RequestDispatcher, a servlet either calls **RequestDispatcher.include(...)** or **RequestDispatcher.forward(...)** method. The dispatch of a request to the target servlet occurs in the same thread as the original request, i.e., the request is handled by same thread (excluding async processing). 
+
+### 8.3.1 Include Method
+
+The **RequestDispatcher.include(...)** method can be called at any time, the target servlet has access to all aspects of the request, but it can only write data to OutputStream of the response, ***it can't modify the headers of response object***, such calls may be ignored. 
+
+Except for servlets obtainer by `getNamedDispatcher(...)` method, when a request is dispatched using the `include` method, the container will set following attributes that made available for the targeted servlet
+
+- javax.servlet.include.mapping - javax.servlet.include.request_uri - same as HttpServletRequest.getRequestURI()   
+- javax.servlet.include.context_path
+    - same as HttpServletRequest.getContextPath()
+- javax.servlet.include.servlet_path
+    - same as HttpServletRequest.getServletPath()
+- javax.servlet.include.path_info
+    - same as HttpServletRequest.getPathInfo()
+- javax.servlet.include.query_string
+    - same as HttpServletRequest.getQueryString()
+
+### 8.3.2 Forward Method
+
+The **RequestDispatcher.forward(...)** method can only be called when there is no output commited to client. If there are data in response output buffer, these data are also cleared before the forwarded servlet's `service` method. The response will be committed and closed by the servlet container before the `forward` method returns, i.e., this is completely handled by the forwarded servlet. For the forwarded servlet, except for dispatcher that is obtained by `getNamedDispatcher(...)`, container will set following attributes:
+
+- javax.servlet.forward.mapping
+- javax.servlet.forward.request_uri
+     - same as HttpServletRequest.getRequestURI()   
+- javax.servlet.forward.context_path
+    - same as HttpServletRequest.getContextPath()
+- javax.servlet.forward.servlet_path
+    - same as HttpServletRequest.getServletPath()
+- javax.servlet.forward.path_info
+    - same as HttpServletRequest.getPathInfo()
+- javax.servlet.forward.query_string
+    - same as HttpServletRequest.getQueryString()
+
+## 8.4 Obtaining an AsyncContext
+
+**AsyncContext** is obtained through **ServletRequest.startAsync()**, we can either complete the processing through **AsyncContext.complete()** or dispatch the requests back to the container (to another servlet).
+
+AsyncContext:
+
+- dispatch(path)
+- dispatch(ServletContext, path)
+- dispatch()
+    - this method uses the same path as the original URI
+
+For requests dispatched from AsyncContext, container will set following attributes:
+
+javax.servlet.async.mapping
+javax.servlet.async.request_uri
+     - same as HttpServletRequest.getRequestURI()   
+javax.servlet.async.context_path
+    - same as HttpServletRequest.getContextPath()
+javax.servlet.async.servlet_path
+    - same as HttpServletRequest.getServletPath()
+javax.servlet.async.path_info
+    - same as HttpServletRequest.getPathInfo()
+javax.servlet.async.query_string
+    - same as HttpServletRequest.getQueryString()
+
+# 9. Chap 10 Web Applications
+
+## 9.1 WebApp and ServletContext
+
+Web application and ServletContext has an **one to one** relationship. 
+
+## 9.2 Directory Structure 
+
+```
+- index.html
+- *.jsp
+- /images/
+- /WEB-INF/lib
+    - web.xml (deployment descriptor)
+    - /classes 
+    - /lib/*.jar
+```
+
+## 9.3 WebApp Class Loader
+
+***"An implementation MUST also guarantee that for every web application deployed in a container, a call to Thread.currentThread.getContextClassLoader() MUST return a ClassLoader instance that implements the contract specified in this section. Furthermore, the ClassLoader instance MUST be a separate instance for each deployed web application."***
+
+# 10. Chap 11 Application Lifecycle Events
+
+## 10.1 Servlet Context Events
+
+Event Type | Description | Listener Interface
+-----------|-------------|-------------------
+Lifecycle | The servlet context has just been created and is available to service its first request, or the servlet context is about to be shut down. | javax.servlet.ServletContextListener
+Changes to attributes | Attributes on the servlet context have been added, removed, or replaced. | javax.servlet.ServletContextAttributeListener
+
+## 10.2 HTTP Session Events
+
+Event Type | Description | Listener Interface
+-----------|-------------|-------------------
+Lifecycle | An HttpSession has been created, invalidated, or timed out. | javax.servlet.http.HttpSessionListener
+Changes to attributes | Attributes have been added, removed, or replaced on an HttpSession. | javax.servlet.http.HttpSessionAttributeListener 
+Changes to id | The id of HttpSession has been changed. | javax.servlet.http.HttpSessionIdListener
+Session migration | HttpSession has been activated or passivated. | javax.servlet.http.HttpSessionActivationListener
+Object binding | Object has been bound to or unbound from HttpSession | javax.servlet.http.HttpSessionBindingListener
+
+## 10.3 Servlet Request Events
+
+Event Type | Description | Listener Interface
+-----------|-------------|-------------------
+Lifecycle | A servlet request has started being processed by Web components. | javax.servlet.ServletRequestListener
+Changes to attributes | Attributes have been added, removed, or replaced on a ServletRequest. | javax.servlet.ServletRequestAttributeListener
+Async events | A timeout, connection termination or completion of async processing | javax.servlet.AsyncListener
+
+***Proper synchronization for HttpSession and ServletContext attributes are needed by the application developer, including listeners.***
+
+# 11. Chap 12 Mapping Requests to Servlets
+
+For **context path**, ***"the Web application selected must have the longest context path that matches the start of the request URL".***
+
+For **request path**, following mapping rules are **used in order**, and the **first successful match is used** with no further attempts.
+
+Rules (**in-order** and **case-sensitive**):
+
+1. find exact match of path
+2. recursively match the longest path-prefix
+3. match by extension if the path contains one (e.g., ends with '.jsp')
+4. attempt to serve requests using default servlet
+
+# 12. Chap 13 Security
+
+**HttpServletRequest** interface provides a few methods for security:
+
+- boolean authenticate(HttpServletResponse response)
+- void login(String username, String password) throws ServletException
+- void logout() throws ServletException 
+- String getRemoteUser()
+- boolean isUserInRole(String role)
+- Principal getUserPrincipal()
+
+## 12.1 Authentication
+
+- HTTP Basic Authentication
+    - username and password based authentication, server requests (or say, challenges) user to authenticate itself, as part of this request/challenge, the server passes a **realm** (which is essentially specified string that may neven change, e.g., "Access to the site"), then the client encodes the username and password using **base64**, it's not secure. 
+- HTTP Digest Authentication
+    - similar to BASIC, but it sends password's hash (possbily with additional data that is hased together with the password) to server.
+- HTTPS Client Authentication
+    - exchanging digital certificates between client and server, instead of using username and password.
+- Form Based Authentication
+
 
