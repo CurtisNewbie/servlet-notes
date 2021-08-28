@@ -96,7 +96,7 @@ To start async processing, in **ServletRequest**, we call **AsyncContext startAs
 ```
 AsyncContext
     
-    void complete();
+    void complete()
 ```
 
 Only when the **AsyncContext#complete()** is called or the `AsyncContext` is **timed out**, the response is committed. 
@@ -106,7 +106,7 @@ Only when the **AsyncContext#complete()** is called or the `AsyncContext` is **t
 ```
 ServletRequest 
 
-    boolean isAsyncSupported();
+    boolean isAsyncSupported()
 ```
 
 We can also check if request supports async processing through **ServletRequest#isAsyncSupported()**. Async support for a servlet request is disabled when one of the filter passed in or the servlet doesn't support async processing.
@@ -116,7 +116,7 @@ We can also check if request supports async processing through **ServletRequest#
 ```
 ServletRequest 
 
-    boolean isAsyncStarted();
+    boolean isAsyncStarted()
 ```
 
 **ServletRequest#isAsyncStarted()** tells whether the async processing for given request is started or not. If the request is dispatched (e.g., to another path) using **AsyncContext.dispatch** method, or the **AsyncContext#complete** is called (meaning the async processing is finished), this method returns false.
@@ -126,7 +126,7 @@ ServletRequest
 ```
 ServletRequest 
 
-    DispatcherType getDispatcherType();
+    DispatcherType getDispatcherType()
 ```
 
 DispatcherType of a request can be checked using **ServletRequest#getDispatcherType()** method. ***"The dispatcher type of a request is used by the container to select the filters that need to be applied to the request. Only filters with the matching dispatcher type and url patterns will be applied."***  
@@ -253,10 +253,10 @@ Request parameters are strings sent to **Servlet Container** as part of the requ
 
 In **ServletRequest**, there are methods provided to access to these prameters:
 
-- String getParameter(String);
-- Enumeration<String> getParameterNames();
-- String[] getParameterValues(String name);
-- Map<String, String[]> getParameterMap();
+- String getParameter(String)
+- Enumeration<String> getParameterNames()
+- String[] getParameterValues(String name)
+- Map<String, String[]> getParameterMap()
 
 ## 3.2 File Upload
 
@@ -264,8 +264,8 @@ Files are uploaded when the request is **multipart/form-data**. When `mutipart/f
 
 HttpServletRequest:
 
-- Collection<Part> getParts() throws IOException, ServletException;
-- Part getPart(String name) throws IOException, ServletException; 
+- Collection<Part> getParts() throws IOException, ServletException
+- Part getPart(String name) throws IOException, ServletException 
 
 Each **Part** provides access to the headers, content type and input stream for it. If the servlet container doesn't support multipart/form-data processing, the data will be accessible through **HttpServletRequest.getInputStream()**.
 
@@ -275,9 +275,9 @@ Attributes of a request (ServletRequest) are extra information set for communica
 
 ServletRequest:
 
-- void setAttribute(String name, Object o);
-- void removeAttribute(String name);
-- Object getAttribute(String name);
+- void setAttribute(String name, Object o)
+- void removeAttribute(String name)
+- Object getAttribute(String name)
 
 ## 3.4 Headers
 
@@ -285,9 +285,9 @@ Headers of HTTP request can be retrieved by follwing methods on **HttpServletReq
 
 HttpServletRequest:
 
-- String getHeader(String name);
-- Enumeration<String> getHeaders(String name);
-- Enumeration<String> getHeaderNames();
+- String getHeader(String name)
+- Enumeration<String> getHeaders(String name)
+- Enumeration<String> getHeaderNames()
 
 ## 3.5 Request Path Elements
 
@@ -308,39 +308,39 @@ These three sections can be accessed through:
 
 HttpServletRequest:
 
-- String getContextPath();
-- String getServletPath();
-- String getPathInfo();
+- String getContextPath()
+- String getServletPath()
+- String getPathInfo()
 
 ## 3.6 Path Translation Method
 
 Two methods are provided to translate given path to a file system path.
 
-- ServletContext.getRealPath(String);
-- HttpServletRequest.getPathTranslate();
+- ServletContext.getRealPath(String)
+- HttpServletRequest.getPathTranslate()
 
-## 3.7 Non Blocking I/O
+## 3.7 Non Blocking IO
 
 **ServletInputStream** and **ServletOutputStream** register **ReadListener** and the **WriteListener** for non blocking I/O, they react to the callback invocation by reading from the `ServletInputStream` or writing to the `ServletOutputStream`. 
 
 For `ServletInputStream`, the registered listener is **ReadListener**, its callback methods are invoked by the container: 
 
 1. when there are data available (for which the implementation will consume the incoming data, e.g., a byte buffer)  
-2. when all data has been consumed by the consumer (i.e., we are done here); 
+2. when all data has been consumed by the consumer (i.e., we are done here) 
 3. when there are some sort of I/O related problems occurred. 
 
 This works in a reactive fasion, so reactive programming like RxJava is normally used, e.g., when `onDataAvailable()` is called by the container, the implementation of **ReadListener** consumes/read data from the inputStream in forms of a `ByteBuffer`, then it publishes this `ByteBuffer` to its subscriber.
 
 ReadListener:
 
-- void onDataAvailable() throws IOException;
-- void onAllDataRead() throws IOException;
-- void onError(Throwable t);
+- void onDataAvailable() throws IOException
+- void onAllDataRead() throws IOException
+- void onError(Throwable t)
 
 WriteListener:
 
-- void onWritePossible() throws IOException;
-- void onError(final Throwable t);
+- void onWritePossible() throws IOException
+- void onError(final Throwable t)
 
 ## 3.8 HTTP/2 Server Push
 
@@ -403,8 +403,8 @@ Clients may tell the server which language they prefer, this information is comm
 
 ServletRequest:
 
-- Locale getLocale();
-- Enumeration<Locale> getLocales();
+- Locale getLocale()
+- Enumeration<Locale> getLocales()
 
 ## 3.12 Request Data Encoding
 
@@ -416,7 +416,142 @@ Data encoding is described through the header **Content-Type**.
 
 # 4. Chap 4 Servlet Context
 
+**ServletContext** defines a servlet's view of the web application. 
 
+## 4.1 Scope of a ServletContext Interface
 
+There is one **ServletContext** instance associated with each web application deployed into a container (per JVM).  
 
+## 4.2 Initialization Parameters
+
+**ServletContext** interface provides following method sto access to the context initialization parameters that are specified by the developers in **deployment descripto**
+
+- String getInitParameter(String name)
+- Enumeration<String> getInitParameterNames()
+
+## 4.3 Configuration Methods
+
+Since Servlet 3.0, **ServletContext** interface provides methods to programmatically configure the context, e..g, configuring servlets, filters, listeners and so on. ***These configuration methods can only be called during initialization of application.*** 
+
+Configuration methods can only be called:
+
+- for **ServletContextListener.contextInitialized()**, which can be registered by **ServletContext.addListener(...)** methods 
+- for **ServletContainerInitializer.onStartup(Set<Class<?>> c, ServletContext ctx)** 
+
+Some of the configuration methods are explained below:
+
+ServletContext:
+
+- for servlets
+    - addServlet(...) - for adding servlet
+    - addJspFile(...) - for adding jsp 
+    - ServletRegistration getServletRegistration(String servletName) - get the registration (e.g., the mapping info) of a servlet by name
+- for filters
+    - addFilter(...k) - for adding filter
+    - FilterRegistration getFilterRegistration(String filterName) - get the registration (e.g., the mapping info) of a filter by name
+- for listeners 
+    - addListener(...) - for adding listener
+- for sessions
+    - getSessionTimeout() - get the configured session timeout
+    - setSessionTimeout(int) - set session timeout
+- for character encoding
+    - getRequestCharacterEncoding()
+    - setRequestCharacterEncoding(String)
+    - getResponseCharacterEncoding()
+    - setResponseCharacterEncoding(String)
+
+## 4.4 Context Attributes
+
+Attributes are shared within the servlet context / web application (with other servlets). Attributes of the context can be set or retrieved by following methods:
+
+ServletContext:
+
+- void setAttribute(String, Object)
+- Object getAttribute(String)
+- Enumeration<String> getAttributeNames()
+- void removeAttribute()
+
+## 4.5 Resources
+
+**ServletContext** interface provides only access to the **static** content and documents that are part of the web application, e.g., html, images, these files are located at the **'META-INF/resources'** folder, and the path passed in are relative to this folder inside web application. These methods are not used for dynamic content.
+
+ServletContext:
+
+- URL getResource(String path) throws MalformedURLException
+- InputStream getResourceAsStream(String path)
+
+## 4.6 Multiple Hosts and Servlet Contexts
+
+Web servers may support multiple logical hosts that share a single IP address on the server, this is called **virtual hosting**. In such case, ***each logical host has its onw servlet context (s).** The method **ServletContext.getVirtualServerName()** will return same name for all servlet contexts for different logical hosts. 
+
+## 4.7 Temporary Working Directories
+
+A temporary storage directory is provided for each servlet context by the container. This directory is available through the **javax.servlet.context.tempdir** context attribute. This directory may or may not be maintained during a servlet container restarts, but it's not visible to other web applications on the container.
+
+# 5. Chap 5 The Response
+
+**Response** object encapsulates the information that is returned from server to client, for HTTP protocol, this information is transmitted by HTTP headers or body.
+
+## 5.1 Buffering
+
+A servlet container may or may not buffer output to client. We can configure the buffering by methods on **ServletResponse**. 
+
+ServletResponse
+
+- int getBufferSize() - get buffer size (if not buffering is used, it will be 0)
+- void setBufferSize(int) - set buffer size
+- boolean isCommitted() - check if the response is committed
+- void reset() - clear any data left in buffer including status code and headers
+- void resetBuffer() - clear any data left in buffer
+- void flushBuffer() - flush the buffer
+
+## 5.2 Headers
+
+Headers of a HTTP response can be set using the methods in **HttpServletResponse** interface. Headers must be set before the response is committed, otherwise, ther are simply ignored.
+
+HttpServletResponse:
+
+- void setHeader(String name, String value)
+- void addHeader(String name, String value)
+
+## 5.3 Non Blocking IO
+
+Non-blocking IO only works with async request and upgrade processing. Similar to Non blocking IO for request, we registers a **WriteListener** to **ServletResponse** object that provides callback methods triggered by the container.
+
+WriteListener:
+
+- void onWritePossible() throws IOException - invoked by container when it can write data
+- void onError(final Throwable t) - handle errors occurred
+
+ServletOutputStream:
+
+- boolean isReady() - tells if the ServletOutputStream is ready to take data
+- void setWriteListener(WriteListener writeListener) - registers a `WriteListener` to write data when it's appropriate
+
+## 5.4 Convenience Methods
+
+**HttpServletResponse** interface provides following convenience methods, these convenience methods have side effect of committing the response, however, if these methods are called when the response is already committed, IllegalStateException is thrown.
+
+- void sendRedirect(String location) throws IOException - send a redirect response to client
+- void sendError(int sc, String msg) throws IOException - send an error response to client
+
+## 5.5 Internationlization
+
+Locale and character encoding of a response can be set using **ServletResponse.setLocale(...)** method and **ServletResponse.setCharacterEncoding(...)**. If none character encoding is specified, the default is **ISO-8859-1**.
+
+## 5.6 Closure of Response Object
+
+When a response is closed, the container immediately flushes all remaining data in buffer to the client. Following are events indicating the request is satisfied and the response is closed.
+
+1. The `Servlet.service` method is returned (for non-async requests)
+2. The amount of data specified in `ServletResponse.setContentLength` or `ServletResponse.setContentLengthLong` methods has been written to the response (i.e., the response body is written)
+3. The `HttpServletResponse.sendError` method is called 
+4. The `HttpServletResponse.sendRedirect` method is called 
+5. The `AsyncContext.complete` method is called (for async requests)
+
+## 5.7 Lifecycle of Response Object
+
+***"Each response object is valid only within the scope of a servlet’s service method, or within the scope of a filter’s doFilter method, unless the associated request object has asynchronous processing enabled for the component. If asynchronous processing on the associated request is started, then the response object remains valid until complete method on AsyncContext is called."***
+
+# 6. Filtering
 
